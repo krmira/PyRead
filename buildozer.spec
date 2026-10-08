@@ -1,58 +1,38 @@
-name: Build Android APK with Buildozer
 
-on:
-  push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
+[app]
 
-jobs:
-  build:
-    runs-on: ubuntu-22.04
+title = PyRead
+package.name = pyread
+package.domain = org.krmira
 
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+source.dir = .
+source.include_exts = py,png,jpg,jpeg,kv,atlas
+source.exclude_dirs = .git,.github,.buildozer,bin,venv,.venv
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
+version = 0.1.0
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
+requirements = python3,kivy,pymupdf
 
-    - name: Install System Dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          git zip unzip python3-pip autoconf libtool pkg-config \
-          zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 \
-          cmake libffi-dev libssl-dev ccache Android-sdk-build-tools
+orientation = portrait
+fullscreen = 0
 
-    - name: Install Buildozer and Cython
-      run: |
-        pip install --upgrade pip setuptools
-        pip install buildozer cython==0.29.33
+# Android configuration
+android.api = 33
+android.minapi = 23
+android.ndk = 25b
+android.ndk_api = 23
 
-    - name: Pre-accept Android SDK Licenses & Prepare Aidl
-      run: |
-        # Pre-create Android SDK directory layout so buildozer doesn't throw AIDL errors
-        mkdir -p $HOME/.buildozer/android/platform/android-sdk/build-tools/34.0.0
-        mkdir -p $HOME/.buildozer/android/platform/android-sdk/licenses
-        
-        # Auto-accept all Android SDK licenses
-        echo -e "\n24333f8a637b3701d543d11247ef301da736e07b\n893305615feb5711112f16c2968a163750e1639d\n791244e692ef40920093228c16d7e6c5f5941036" > $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+android.archs = arm64-v8a, armeabi-v7a
+android.accept_sdk_license = True
 
-    - name: Build Android APK
-      run: |
-        yes | buildozer android debug
+# Keep the app's data private
+android.private_storage = True
 
-    - name: Upload APK Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: PyRead-Python-APK
-        path: bin/*.apk
+# Build settings
+p4a.bootstrap = sdl2
+p4a.branch = master
+
+[buildozer]
+
+log_level = 2
+warn_on_root = 1
