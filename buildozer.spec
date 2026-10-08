@@ -16,19 +16,16 @@ requirements = python3,kivy,pymupdf
 orientation = portrait
 fullscreen = 0
 
-# Android configuration
 android.api = 33
 android.minapi = 23
 android.ndk = 25b
 android.ndk_api = 23
 
-android.archs = arm64-v8a, armeabi-v7a
-android.accept_sdk_license = True
+android.archs = arm64-v8a
 
-# Keep the app's data private
+android.accept_sdk_license = True
 android.private_storage = True
 
-# Build settings
 p4a.bootstrap = sdl2
 p4a.branch = master
 
