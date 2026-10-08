@@ -1,36 +1,65 @@
 
-      - name: Install Android NDK
-        env:
-          ANDROID_SDK_ROOT: ${{ runner.home }}/.buildozer/android/platform/android-sdk
+name: Build PyRead APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Linux dependencies
         run: |
-          set -eux
+          sudo apt-get update
+          sudo apt-get install -y \
+            git zip unzip \
+            build-essential autoconf automake libtool \
+            pkg-config cmake ccache \
+            zlib1g-dev libncurses5-dev libncursesw5-dev \
+            libffi-dev libssl-dev libltdl-dev \
+            libsqlite3-dev
 
-          SDK="$ANDROID_SDK_ROOT"
+      - name: Install Buildozer
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install "Cython==0.29.36" "buildozer==1.5.0"
 
-          if [ ! -d "$SDK/cmdline-tools" ] && [ ! -d "$SDK/tools/bin" ]; then
-            echo "Android SDK command-line tools are missing."
-            find "$SDK" -maxdepth 4 -type f -name sdkmanager
-            exit 1
-          fi
+      - name: Check project files
+        run: |
+          test -f main.py
+          test -f buildozer.spec
+          grep -q '^\[app\]' buildozer.spec
 
-          if [ -x "$SDK/cmdline-tools/latest/bin/sdkmanager" ]; then
-            SDKMANAGER="$SDK/cmdline-tools/latest/bin/sdkmanager"
-          elif [ -x "$SDK/tools/bin/sdkmanager" ]; then
-            SDKMANAGER="$SDK/tools/bin/sdkmanager"
-          else
-            SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -name sdkmanager 2>/dev/null | head -n 1)"
-          fi
+      - name: Build debug APK
+        run: buildozer -v android debug
 
-          if [ -z "$SDKMANAGER" ] || [ ! -x "$SDKMANAGER" ]; then
-            echo "Could not find executable sdkmanager."
-            exit 1
-          fi
-
-          "$SDKMANAGER" --sdk_root="$SDK" --licenses || true
-          "$SDKMANAGER" --sdk_root="$SDK" "ndk;25.2.9519653"
-
-          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK_HOME=$SDK/ndk/25.2.9519653" >> "$GITHUB_ENV"
-
-          test -d "$SDK/ndk/25.2.9519653"
+      - name: Upload APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PyRead-debug-apk
+          path: bin/*.apk
+          if-no-files-found: warn
+          retention-days: 7
