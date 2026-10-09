@@ -1,14 +1,18 @@
-
-name: Build PyRead APK
+name: Build Android APK
 
 on:
   push:
-    branches:
-      - main
+    branches: [main, master]
+    tags: ["v*"]
+  pull_request:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write   # needed to attach the APK to a GitHub Release on tags
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -16,50 +20,49 @@ jobs:
     timeout-minutes: 120
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.11"
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Install Linux dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            git zip unzip \
-            build-essential autoconf automake libtool \
-            pkg-config cmake ccache \
-            zlib1g-dev libncurses5-dev libncursesw5-dev \
-            libffi-dev libssl-dev libltdl-dev \
-            libsqlite3-dev
+          sudo apt-get install -y --no-install-recommends \
+            git zip unzip openjdk-17-jdk autoconf automake libtool pkg-config \
+            zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake \
+            libffi-dev libssl-dev ccache build-essential
+
+      - name: Cache Buildozer (SDK, NDK, python-for-android)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            .buildozer
+          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
+          restore-keys: |
+            buildozer-${{ runner.os }}-
 
       - name: Install Buildozer
         run: |
-          python -m pip install --upgrade pip setuptools wheel
-          python -m pip install "Cython==0.29.36" "buildozer==1.5.0"
-
-      - name: Check project files
-        run: |
-          test -f main.py
-          test -f buildozer.spec
-          grep -q '^\[app\]' buildozer.spec
+          python -m pip install --upgrade pip
+          pip install --upgrade buildozer "cython==0.29.37" virtualenv setuptools
 
       - name: Build debug APK
         run: buildozer -v android debug
 
-      - name: Upload APK
-        if: always()
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PyRead-debug-apk
+          name: pdf-reader-apk
           path: bin/*.apk
-          if-no-files-found: warn
-          retention-days: 7
+          if-no-files-found: error
+
+      - name: Publish GitHub Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: bin/*.apk
